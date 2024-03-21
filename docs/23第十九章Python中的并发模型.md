@@ -147,7 +147,21 @@ Contention
 ##### 示例 19-1：spinner _ thread . py:`spin`和`slow`函数
 
 ```
-importitertoolsimporttimefromthreadingimportThread,Eventdefspin(msg:str,done:Event)->None:①forcharinitertools.cycle(r'\|/-'):②status=f'\r{char} {msg}'③print(status,end='',flush=True)ifdone.wait(.1):④break⑤blanks=''*len(status)print(f'\r{blanks}\r',end='')⑥defslow()->int:time.sleep(3)⑦return42
+import itertools
+import time
+from threading import Thread,Event
+
+defspin(msg:str,done:Event)->None:①
+    for charin itertools.cycle(r'\|/-'):②
+        status=f'\r{char} {msg}'③
+        print(status,end='',flush=True)
+        if done.wait(.1):④
+            break⑤
+    blanks=''*len(status)
+    print(f'\r{blanks}\r',end='')⑥
+def slow()->int:
+    time.sleep(3)⑦
+    return42
 ```
 
 ① 这个函数将在一个单独的线程中运行。`done`参数是`threading.Event`的一个实例，一个简单的同步线程的对象。
