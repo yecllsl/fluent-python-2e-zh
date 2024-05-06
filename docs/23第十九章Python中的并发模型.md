@@ -161,7 +161,7 @@ defspin(msg:str,done:Event)->None:①
     print(f'\r{blanks}\r',end='')⑥
 def slow()->int:
     time.sleep(3)⑦
-    return42
+    return 42
 ```
 
 ① 这个函数将在一个单独的线程中运行。`done`参数是`threading.Event`的一个实例，一个简单的同步线程的对象。
@@ -191,7 +191,22 @@ def slow()->int:
 ##### 示例 19-2：spinner _ thread . py:`supervisor`和`main`功能
 
 ```
-defsupervisor()->int:①done=Event()②spinner=Thread(target=spin,args=('thinking!',done))③print(f'spinner object: {spinner}')④spinner.start()⑤result=slow()⑥done.set()⑦spinner.join()⑧returnresultdefmain()->None:result=supervisor()⑨print(f'Answer: {result}')if__name__=='__main__':main()
+def supervisor() -> int:  # <1>
+    done = Event()  # <2>
+    spinner = Thread(target=spin, args=('thinking!', done))  # <3>
+    print(f'spinner object: {spinner}')  # <4>
+    spinner.start()  # <5>
+    result = slow()  # <6>
+    done.set()  # <7>
+    spinner.join()  # <8>
+    return result
+
+def main() -> None:
+    result = supervisor()  # <9>
+    print(f'Answer: {result}')
+
+if __name__ == '__main__':
+    main()
 ```
 
 ① `supervisor`将返回`slow`的结果。
@@ -225,7 +240,46 @@ defsupervisor()->int:①done=Event()②spinner=Thread(target=spin,args=('thinkin
 ##### 示例 19-3： spinner_proc.py:只显示改变的部分；其他都和 spinner_thread.py 一样
 
 ```
-importitertoolsimporttimefrommultiprocessingimportProcess,Event①frommultiprocessingimportsynchronize②defspin(msg:str,done:synchronize.Event)->None:③# [snip] the rest of spin and slow functions are unchanged from spinner_thread.pydefsupervisor()->int:done=Event()spinner=Process(target=spin,④args=('thinking!',done))print(f'spinner object: {spinner}')⑤spinner.start()result=slow()done.set()spinner.join()returnresult# [snip] main function is unchanged as well
+
+import itertools
+import time
+from multiprocessing import Process, Event  # <1>
+from multiprocessing import synchronize     # <2>
+
+def spin(msg: str, done: synchronize.Event) -> None:  # <3>
+# end::SPINNER_PROC_IMPORTS[]
+    for char in itertools.cycle(r'\|/-'):
+        status = f'\r{char} {msg}'
+        print(status, end='', flush=True)
+        if done.wait(.1):
+            break
+    blanks = ' ' * len(status)
+    print(f'\r{blanks}\r', end='')
+
+def slow() -> int:
+    time.sleep(3)
+    return 42
+
+# tag::SPINNER_PROC_SUPER[]
+def supervisor() -> int:
+    done = Event()
+    spinner = Process(target=spin,               # <4>
+                      args=('thinking!', done))
+    print(f'spinner object: {spinner}')          # <5>
+    spinner.start()
+    result = slow()
+    done.set()
+    spinner.join()
+    return result
+# end::SPINNER_PROC_SUPER[]
+
+def main() -> None:
+    result = supervisor()
+    print(f'Answer: {result}')
+
+
+if __name__ == '__main__':
+    main()
 ```
 
 ① 基本的`multiprocessing` API 模仿了`threading` API，但是类型提示和 Mypy 暴露了这种差异:`multiprocessing.Event`是一个函数(不是像`threading.Event`那样的类),它返回一个`synchronize.Event`实例…
@@ -259,7 +313,19 @@ importitertoolsimporttimefrommultiprocessingimportProcess,Event①frommultiproce
 ##### 示例 19-4：spinner _ async . py:`main`函数和`supervisor`协程
 
 ```
-defmain()->None:①result=asyncio.run(supervisor())②print(f'Answer: {result}')asyncdefsupervisor()->int:③spinner=asyncio.create_task(spin('thinking!'))④print(f'spinner object: {spinner}')⑤result=awaitslow()⑥spinner.cancel()⑦returnresultif__name__=='__main__':main()
+def main() -> None:  # <1>
+    result = asyncio.run(supervisor())  # <2>
+    print(f'Answer: {result}')
+
+async def supervisor() -> int:  # <3>
+    spinner = asyncio.create_task(spin('thinking!'))  # <4>
+    print(f'spinner object: {spinner}')  # <5>
+    result = await slow()  # <6>
+    spinner.cancel()  # <7>
+    return result
+
+if __name__ == '__main__':
+    main()
 ```
 
 ① `main`是这个程序中唯一定义的正则函数——其他的是协程。
@@ -299,7 +365,23 @@ defmain()->None:①result=asyncio.run(supervisor())②print(f'Answer: {result}')
 ##### 示例 19-5：spinner _ async . py:`spin`和`slow`协程
 
 ```
-importasyncioimportitertoolsasyncdefspin(msg:str)->None:①forcharinitertools.cycle(r'\|/-'):status=f'\r{char} {msg}'print(status,flush=True,end='')try:awaitasyncio.sleep(.1)②exceptasyncio.CancelledError:③breakblanks=''*len(status)print(f'\r{blanks}\r',end='')asyncdefslow()->int:awaitasyncio.sleep(3)④return42
+import asyncio
+import itertools
+
+async def spin(msg: str) -> None:  # <1>
+    for char in itertools.cycle(r'\|/-'):
+        status = f'\r{char} {msg}'
+        print(status, flush=True, end='')
+        try:
+            await asyncio.sleep(.1)  # <2>
+        except asyncio.CancelledError:  # <3>
+            break
+    blanks = ' ' * len(status)
+    print(f'\r{blanks}\r', end='')
+
+async def slow() -> int:
+    await asyncio.sleep(3)  # <4>
+    return 42
 ```
 
 ① 我们不需要用于表示`slow`已经完成其在 *spinner_thread.py* 中的工作的`Event`参数(示例 19-1 )。
